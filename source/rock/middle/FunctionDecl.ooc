@@ -20,7 +20,7 @@ FunctionDecl: class extends Declaration {
     isProto := false
     externName : String = null
     unmangledName: String = null
-    
+    isAnon := false 
     /** If this FunctionDecl is a shim to make a VariableDecl callable, then vDecl is set to that variable decl. */
     vDecl : VariableDecl = null
     
@@ -29,6 +29,8 @@ FunctionDecl: class extends Declaration {
     returnArg : Argument = null
     body := Scope new()
     
+    variablesToPartial := ArrayList<VariableDecl> new()
+    
     owner : TypeDecl = null
     staticVariant : This = null
     
@@ -36,6 +38,7 @@ FunctionDecl: class extends Declaration {
 
     init: func ~funcDecl (=name, .token) {
         super(token)
+        this isAnon = name isEmpty()
     }
     
     accept: func (visitor: Visitor) { visitor visitFunctionDecl(this) }
@@ -66,8 +69,11 @@ FunctionDecl: class extends Declaration {
     isProto:    func -> Bool { isProto }
     setProto:   func (=isProto) {}
     
-    isAnon:     func -> Bool {name isEmpty()}
+    isAnon:     func -> Bool { isAnon }
 
+    markForPartialing: func(var: VariableDecl) {
+        if (!variablesToPartial contains(var)) variablesToPartial add(var)
+    }
     setOwner: func (=owner) {
         if(isStatic) return
         staticVariant = new(name, token)
@@ -207,7 +213,9 @@ FunctionDecl: class extends Declaration {
     
     resolve: func (trail: Trail, res: Resolver) -> Response {
         
-        if (isAnon()) {
+        isClosure := false
+        if (name isEmpty()) { // Check if the function is anonymous
+            isClosure = true
             module := trail module()
             name = generateTempName(module getUnderName() + "_closure")
             varAcc := VariableAccess new(name, token)
@@ -262,6 +270,12 @@ FunctionDecl: class extends Declaration {
                 if(res params veryVerbose) printf("))))))) For %s, response of autoReturn = %s\n", toString(), response toString())
                 trail pop(this)
                 return response
+            }
+        }
+        
+        if (isClosure) {
+            for (e in variablesToPartial) {
+                e getName() println()
             }
         }
         
