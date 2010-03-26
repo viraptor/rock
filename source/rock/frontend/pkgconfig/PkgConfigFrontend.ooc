@@ -9,7 +9,7 @@ import PkgInfo
  */
 PkgConfigFrontend: class {
 
-    cache := static HashMap<PkgInfo> new()
+    cache := static HashMap<String, PkgInfo> new()
 	
 	/**
 	 * 
@@ -18,7 +18,7 @@ PkgConfigFrontend: class {
 	 */
 	getInfo: static func (pkgName: String) -> PkgInfo {
 		
-        cached := cache get(pkgName)
+        cached := This cache get(pkgName)
 		if(cached != null) {
 			return cached
 		}
@@ -35,7 +35,7 @@ PkgConfigFrontend: class {
 		}
         
         pkgInfo := PkgInfo new(pkgName, libs, cflags)
-		cache put(pkgName, pkgInfo)
+		This cache put(pkgName, pkgInfo)
 		pkgInfo
 		
 	}

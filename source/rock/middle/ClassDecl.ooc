@@ -2,7 +2,8 @@ import structs/ArrayList
 
 import ../frontend/Token
 import Expression, Type, Visitor, TypeDecl, Cast, FunctionCall, FunctionDecl,
-	   Module, Node, VariableDecl, VariableAccess, BinaryOp, Argument, Return
+	   Module, Node, VariableDecl, VariableAccess, BinaryOp, Argument,
+       Return, CoverDecl
 import tinker/[Response, Resolver, Trail]
 
 ClassDecl: class extends TypeDecl {
@@ -21,7 +22,7 @@ ClassDecl: class extends TypeDecl {
     }
     
     init: func ~classDeclNotMeta(.name, .superType, .token) {
-        this(name, superType, false, token)
+        init(name, superType, false, token)
     }
 
     init: func ~classDecl(.name, .superType, =isMeta, .token) {
@@ -45,21 +46,45 @@ ClassDecl: class extends TypeDecl {
 			}
 	    }
         
-	    if(shouldDefault && functions get(DEFAULTS_FUNC_NAME) == null) {
-			addFunction(FunctionDecl new(DEFAULTS_FUNC_NAME, token))
+        // TODO: a more elegant solution maybe?
+        meat : ClassDecl = isMeta ? this : getMeta()
+        if(shouldDefault && !meat functions contains(This DEFAULTS_FUNC_NAME)) {
+			addFunction(FunctionDecl new(This DEFAULTS_FUNC_NAME, token))
 	    }
-        if(shouldLoad && functions get(LOAD_FUNC_NAME) == null) {
-            fDecl := FunctionDecl new(LOAD_FUNC_NAME, token)
+        if(shouldLoad && !meat functions contains(This LOAD_FUNC_NAME)) {
+            fDecl := FunctionDecl new(This LOAD_FUNC_NAME, token)
             fDecl setStatic(true)
 			addFunction(fDecl)
 	    }
     
         {
-            response := super resolve(trail, res)
+            response := super(trail, res)
             if(!response ok()) return response
         }
         
         return Responses OK
+    }
+    
+    getLoadFunc: func -> FunctionDecl {
+        // TODO: a more elegant solution maybe?
+        meat : ClassDecl = isMeta ? this : getMeta()
+        fDecl := meat functions get(This LOAD_FUNC_NAME)
+        if(fDecl == null) {
+            fDecl = FunctionDecl new(This LOAD_FUNC_NAME, token)
+            addFunction(fDecl)
+        }
+        return fDecl
+    }
+    
+    getDefaultsFunc: func -> FunctionDecl {
+        // TODO: a more elegant solution maybe?
+        meat : ClassDecl = isMeta ? this : getMeta()
+        fDecl := meat functions get(This DEFAULTS_FUNC_NAME)
+        if(fDecl == null) {
+            fDecl = FunctionDecl new(This DEFAULTS_FUNC_NAME, token)
+            addFunction(fDecl)
+        }
+        return fDecl
     }
     
     getBaseClass: func (fDecl: FunctionDecl) -> ClassDecl {
@@ -70,7 +95,8 @@ ClassDecl: class extends TypeDecl {
                 return base
             }
 		}
-		if(getFunction(fDecl name, fDecl suffix, null, false) != null) return this
+        finalScore : Int
+		if(getFunction(fDecl name, fDecl suffix, null, false, finalScore&) != null) return this
 		return null
 	}
     
@@ -116,11 +142,13 @@ ClassDecl: class extends TypeDecl {
             }
         }
 	
-		super addFunction(fDecl)
+		super(fDecl)
         
     }
 
 	addInit: func(fDecl: FunctionDecl) {
+        
+        isCover := (getNonMeta() instanceOf(CoverDecl))
         
 		if(defaultInit != null) {
             /*
@@ -147,10 +175,16 @@ ClassDecl: class extends TypeDecl {
         // meta-class, remember?
         newTypeAccess := VariableAccess new(newType, fDecl token)
         newTypeAccess setRef(getNonMeta())
-        allocCall := FunctionCall new(newTypeAccess, "alloc", fDecl token)
-		cast := Cast new(allocCall, newType, fDecl token)
-		vdfe := VariableDecl new(null, "this", cast, fDecl token)
-		constructor getBody() add(vdfe)
+        
+        vdfe : VariableDecl = null
+        if(!isCover) {
+            allocCall := FunctionCall new(newTypeAccess, "alloc", fDecl token)
+            expr := Cast new(allocCall, newType, fDecl token)
+            vdfe = VariableDecl new(null, "this", expr, fDecl token)
+        } else {
+            vdfe = VariableDecl new(newType clone(), "this", fDecl token)
+        }
+        constructor getBody() add(vdfe)
 		
         for (typeArg in getTypeArgs()) {
         	e := VariableAccess new(typeArg getName(), constructor token)
@@ -167,8 +201,10 @@ ClassDecl: class extends TypeDecl {
 		thisAccess := VariableAccess new(vdfe, fDecl token)
 		thisAccess setRef(vdfe)
 		
-        defaultsCall := FunctionCall new("__defaults__", fDecl token)
-        constructor getBody() add(defaultsCall)
+        if(!isCover) {
+            defaultsCall := FunctionCall new("__defaults__", fDecl token)
+            constructor getBody() add(defaultsCall)
+        }
         
         initCall := FunctionCall new(fDecl getName(), fDecl token)
         initCall setSuffix(fDecl getSuffix())

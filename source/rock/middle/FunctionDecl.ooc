@@ -1,9 +1,9 @@
 import structs/[Stack, ArrayList], text/Buffer
 import ../frontend/[Token, BuildParams]
 import Expression, Type, Visitor, Argument, TypeDecl, Scope,
-       VariableAccess, ControlStatement, Return, IntLiteral, Else,
+       VariableAccess, ControlStatement, Return, IntLiteral, If, Else,
        VariableDecl, Node, Statement, Module, FunctionCall, Declaration,
-       Version, StringLiteral
+       Version, StringLiteral, Conditional, Import
 import tinker/[Resolver, Response, Trail]
 
 FunctionDecl: class extends Declaration {
@@ -21,6 +21,10 @@ FunctionDecl: class extends Declaration {
     externName : String = null
     unmangledName: String = null
     isAnon := false 
+    
+    // if true, 'this' has byref semantics
+    isThisRef := false
+    
     /** If this FunctionDecl is a shim to make a VariableDecl callable, then vDecl is set to that variable decl. */
     vDecl : VariableDecl = null
     
@@ -143,7 +147,7 @@ FunctionDecl: class extends Declaration {
         fullName
     }
     
-    getType: func -> Type { type }
+    getType: func -> Type { This type }
 
     getArgsRepr: func -> String {
         if(args size() == 0) return ""
@@ -170,7 +174,7 @@ FunctionDecl: class extends Declaration {
     }
     
     toString: func -> String {
-        (suffix ? (name + "~" + suffix) : name) + (isStatic ? ": static func " : ": func ") + getArgsRepr() + (hasReturn() ? " -> " + returnType toString() : "")
+        (owner ? owner getName() + "." : "") + (suffix ? (name + "~" + suffix) : name) + (isStatic ? ": static func " : ": func ") + getArgsRepr() + (hasReturn() ? " -> " + returnType toString() : "")
     }
     
     isResolved: func -> Bool { false }
@@ -194,7 +198,7 @@ FunctionDecl: class extends Declaration {
         //printf("Looking for %s in %s\n", access toString(), toString())
         
         if(owner && access name == "this") {
-            if(access suggest(owner thisDecl)) return
+            if(access suggest(isThisRef ? owner thisRefDecl : owner thisDecl)) return
         }
         
         for(typeArg in typeArgs) {
@@ -225,7 +229,7 @@ FunctionDecl: class extends Declaration {
         }
         trail push(this)
         
-        if(res params veryVerbose) printf("** Resolving function decl %s\n", name)
+        //if(res params veryVerbose) printf("** Resolving function decl %s\n", name)
 
         for(arg in args) {
             response := arg resolve(trail, res)
@@ -246,12 +250,14 @@ FunctionDecl: class extends Declaration {
         }
         
         {
-            //printf("Resolving return type %s\n", returnType toString())
             response := returnType resolve(trail, res)
             if(!response ok()) {
                 if(res params veryVerbose) printf("))))))) For %s, response of return type %s = %s\n", toString(), returnType toString(), response toString()) 
                 trail pop(this)
                 return response
+            }
+            if(returnType getRef() == null) {
+                res wholeAgain(this, "need returnType of decl " + name)
             }
         }
         
@@ -274,8 +280,19 @@ FunctionDecl: class extends Declaration {
         }
         
         if (isClosure) {
+            i := 0 // The context-vars have to be placed before the other args
+            /* Simple tests
+            tmp := VariableDecl new (variablesToPartial get(0) getType(),"blah", StringLiteral new("buuh", token),token)
+            trail addBeforeInScope(This, tmp) 
+            fCall := FunctionCall new("blub", token)
+            trail addBeforeInScope(This, fCall)
+            */
+            im := Import new("math/Random")
+            module := trail module() 
+            module addImport(im)
             for (e in variablesToPartial) {
                 e getName() println()
+                args add(i,Argument new(e getType(), e getName(), token))
             }
         }
         
@@ -314,19 +331,25 @@ FunctionDecl: class extends Declaration {
             returnNeeded(trail)
             return
         }
-                
-        last := scope last()
+
+        handleLastStatement(trail, res, scope, scope lastIndex())
         
-        if(last instanceOf(Return)) {
+    }
+    
+    handleLastStatement: func (trail: Trail, res: Resolver, scope: Scope, index: Int) {
+        
+        stmt := scope get(index)
+        
+        if(stmt instanceOf(Return)) {
             //printf("[autoReturn] Oh, it's a %s already. Nice =D!\n",  last toString())
             return
         }
         
-        if(last instanceOf(Expression)) {
-            expr := last as Expression
+        if(stmt instanceOf(Expression)) {
+            expr := stmt as Expression
             if(expr getType() == null) {
-                //printf("[autoReturn] LOOPing because last's type (%s) is null.", expr toString())
-                res wholeAgain(this, "last's type is null")
+                //printf("[autoReturn] LOOPing because stmt's type (%s) is null.", expr toString())
+                res wholeAgain(this, "stmt's type is null")
                 return
             }
             
@@ -337,9 +360,20 @@ FunctionDecl: class extends Declaration {
             }
             
             if(!expr getType() equals(voidType)) {
-                //printf("[autoReturn] Hmm it's a %s\n", last toString())
-                scope set(scope lastIndex(), Return new(last, last token))
-                //printf("[autoReturn] Replaced with a %s!\n", scope last() toString())
+                //printf("[autoReturn] Hmm it's a %s\n", stmt toString())
+                scope set(index, Return new(stmt, stmt token))
+                //printf("[autoReturn] Replaced with a %s!\n", scope get(index) toString())
+            }
+        } else if(stmt instanceOf(ControlStatement)) {
+            cStat := stmt as ControlStatement
+            if(cStat isDeadEnd()) {
+                autoReturnExplore(trail, res, cStat getBody())
+                if(cStat instanceOf(Else) && index > 0 && scope get(index - 1) instanceOf(Conditional)) {
+                    //printf("[autoReturn] Should handle the if too!\n")
+                    handleLastStatement(trail, res, scope, index - 1)
+                }
+            } else {
+                returnNeeded(trail)
             }
         } else {
             //printf("[autoReturn] Huh, last is a %s, needing return\n", last toString())

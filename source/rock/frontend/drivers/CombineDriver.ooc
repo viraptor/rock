@@ -1,7 +1,6 @@
 import io/File
 import structs/[List, ArrayList]
-import ../[BuildParams]
-import ../Target
+import ../[BuildParams, Target]
 import ../../middle/Module
 import Driver
 
@@ -19,13 +18,17 @@ CombineDriver: class extends Driver {
         params compiler addIncludePath(File new(params distLocation, "libs/headers/") getPath())
         params compiler addIncludePath(params outPath getPath())
         addDeps(module, ArrayList<Module> new(), ArrayList<String> new())
-        for(dynamicLib: String in params dynamicLibs) {
+        
+        for(define in params defines) {
+			params compiler defineSymbol(define)
+		}
+        for(dynamicLib in params dynamicLibs) {
             params compiler addDynamicLibrary(dynamicLib)
         }
-        for(additional: String in additionals) {
+        for(additional in additionals) {
             params compiler addObjectFile(additional)
         }
-        for(compilerArg: String in compilerArgs) {
+        for(compilerArg in compilerArgs) {
             params compiler addObjectFile(compilerArg)
         }
         
@@ -37,7 +40,7 @@ CombineDriver: class extends Driver {
             }
             libs := getFlagsFromUse(module)
             for(lib in libs) {
-                printf("[CombineDriver] Adding lib %s from use\n", lib)
+                //printf("[CombineDriver] Adding lib %s from use\n", lib)
                 params compiler addObjectFile(lib)
             }
             

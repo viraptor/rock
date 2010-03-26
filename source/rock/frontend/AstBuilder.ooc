@@ -17,7 +17,7 @@ nq_parse: extern proto func (AstBuilder, String) -> Int
 
 AstBuilder: class {
 
-    cache := static HashMap<Module> new()
+    cache := static HashMap<String, Module> new()
 
     params: BuildParams
     modulePath: String
@@ -29,10 +29,8 @@ AstBuilder: class {
 
     init: func (=modulePath, =module, =params) {
 
-        if(params verbose) {
-            printf("- Parsing %s (for module %s)\n", modulePath, module fullName)
-        }
-        cache put(modulePath, module)
+        if(params verbose) printf("- Parsing %s\n", modulePath)
+        This cache put(modulePath, module)
 
         stack = Stack<Node> new()
         stack push(module)
@@ -89,7 +87,7 @@ AstBuilder: class {
 
             //println("Trying to get "+impPath path+" from cache")
             cached : Module = null
-            cached = cache get(impPath path)
+            cached = This cache get(impPath path)
 
             //if(!cached || File new(impPath path) lastModified() > cached lastModified) {
             if(!cached) {
@@ -107,8 +105,8 @@ AstBuilder: class {
 
     printCache: func {
         printf("==== Cache ====\n")
-        for(key in cache keys) {
-            printf("cache %s => %s\n", key, cache get(key) fullName)
+        for(key in This cache getKeys()) {
+            printf("cache %s => %s\n", key, This cache get(key) fullName)
         }
         printf("===============\n")
     }
@@ -118,7 +116,6 @@ AstBuilder: class {
     }
 
     onUse: unmangled(nq_onUse) func (identifier: String) {
-        printf("Got use %s for module %s\n", identifier, module getFullName())
         module addUse(Use new(identifier, params, token()))
     }
 
@@ -367,6 +364,10 @@ AstBuilder: class {
         PointerType new(type, token())
     }
     
+    onTypeReference: unmangled(nq_onTypeReference) func (type: Type) -> Type {
+        ReferenceType new(type, token())
+    }
+    
     onTypeBrackets: unmangled(nq_onTypeBrackets) func (type: Type, inner: Expression) -> Type {
         ArrayType new(type, inner, token())
     }
@@ -428,6 +429,9 @@ AstBuilder: class {
 
     onFunctionAbstract: unmangled(nq_onFunctionAbstract) func {
         peek(FunctionDecl) isAbstract = true
+    }
+    onFunctionThisRef: unmangled(nq_onFunctionThisRef) func {
+        peek(FunctionDecl) isThisRef = true
     }
     onFunctionStatic: unmangled(nq_onFunctionStatic) func {
         peek(FunctionDecl) isStatic = true
@@ -699,7 +703,8 @@ AstBuilder: class {
     }
 
     onCaseEnd: unmangled(nq_onCaseEnd) func {
-        pop(Case)
+        caze := pop(Case)
+        peek(Match) addCase(caze)
     }
 
     onBreak: unmangled(nq_onBreak) func -> FlowControl {

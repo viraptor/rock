@@ -1,12 +1,12 @@
 import structs/[List, ArrayList, HashMap]
 import ../../middle/[ClassDecl, FunctionDecl, VariableDecl, TypeDecl,
-        Type, Node, InterfaceDecl, InterfaceImpl]
+        Type, Node, InterfaceDecl, InterfaceImpl, CoverDecl]
 import Skeleton, FunctionDeclWriter, CGenerator, VersionWriter
 
 ClassDeclWriter: abstract class extends CGenerator {
 
-    LANG_PREFIX := static const "lang_types__";
-    CLASS_NAME := static const LANG_PREFIX + "Class";
+    LANG_PREFIX := static const "lang_types__"
+    CLASS_NAME := static const This LANG_PREFIX + "Class"
     
     write: static func ~_class (this: This, cDecl: ClassDecl) {
 
@@ -36,7 +36,11 @@ ClassDeclWriter: abstract class extends CGenerator {
                 if(cDecl getVersion()) VersionWriter writeStart(this, cDecl getVersion())
             }
 
-            writeClassGettingFunction(this, cDecl)
+            // don't write class-getting functions of extern covers - it hurts
+            if(cDecl getNonMeta() == null || !cDecl getNonMeta() instanceOf(CoverDecl) || !cDecl getNonMeta() as CoverDecl isExtern()) {
+                writeClassGettingFunction(this, cDecl)
+            }
+            
             if(cDecl getVersion()) VersionWriter writeEnd(this)
             
             for(interfaceDecl in cDecl getNonMeta() getInterfaceDecls()) {
@@ -61,10 +65,10 @@ ClassDeclWriter: abstract class extends CGenerator {
     
     writeObjectStruct: static func (this: This, cDecl: ClassDecl) {
         
-        current nl(). app("struct _"). app(cDecl underName()). app(' '). openBlock(). nl()
+        current nl(). app("struct _"). app(cDecl underName()). app(' '). openBlock()
 
-        if (!(cDecl name equals("Object"))) {
-            current app("struct _"). app(cDecl getSuperRef() underName()). app(" __super__;")
+        if (cDecl name != "Object" && cDecl getSuperRef() != null) {
+            current nl(). app("struct _"). app(cDecl getSuperRef() underName()). app(" __super__;")
         }
         
         for(vDecl in cDecl variables) {
@@ -150,7 +154,8 @@ ClassDeclWriter: abstract class extends CGenerator {
             
             if(decl getName() == ClassDecl LOAD_FUNC_NAME) {
                 superRef := cDecl getSuperRef()
-            	superLoad := superRef getFunction(ClassDecl LOAD_FUNC_NAME, null, null)
+                finalScore: Int
+            	superLoad := superRef getFunction(ClassDecl LOAD_FUNC_NAME, null, null, finalScore&)
             	if(superLoad) {
 					FunctionDeclWriter writeFullName(this, superLoad)
 					current app("_impl(("). app(superLoad owner getInstanceType()). app(") this);")
@@ -211,7 +216,8 @@ ClassDeclWriter: abstract class extends CGenerator {
 
             if(decl getName() == ClassDecl DEFAULTS_FUNC_NAME) {
             	superRef := cDecl getSuperRef()
-            	superDefaults := superRef getFunction(ClassDecl DEFAULTS_FUNC_NAME, null, null)
+                finalScore: Int
+            	superDefaults := superRef getFunction(ClassDecl DEFAULTS_FUNC_NAME, null, null, finalScore&)
             	if(superDefaults) {
 					FunctionDeclWriter writeFullName(this, superDefaults)
 					current app("_impl(("). app(superDefaults owner getInstanceType()). app(") this);")
@@ -239,7 +245,7 @@ ClassDeclWriter: abstract class extends CGenerator {
         current nl(). nl(). app(underName). app(" *"). app(cDecl getNonMeta() getFullName()). app("_class()"). openBlock(). nl()
         
         if (cDecl getNonMeta() getSuperRef()) {
-            current app("static "). app(LANG_PREFIX). app("Bool __done__ = false;"). nl()
+            current app("static "). app(This LANG_PREFIX). app("Bool __done__ = false;"). nl()
         }
         current app("static "). app(underName). app(" class = "). nl()
         
@@ -247,9 +253,9 @@ ClassDeclWriter: abstract class extends CGenerator {
         
         current app(';')
         if (cDecl getNonMeta() getSuperRef()) {
-            current nl(). app(CLASS_NAME). app(" *classPtr = ("). app(CLASS_NAME). app(" *) &class;")
+            current nl(). app(This CLASS_NAME). app(" *classPtr = ("). app(This CLASS_NAME). app(" *) &class;")
             current nl(). app("if(!__done__)"). openBlock().
-                    nl(). app("classPtr->super = ("). app(CLASS_NAME). app("*) "). app(cDecl getNonMeta() getSuperRef() getFullName()). app("_class();").
+                    nl(). app("classPtr->super = ("). app(This CLASS_NAME). app("*) "). app(cDecl getNonMeta() getSuperRef() getFullName()). app("_class();").
                     nl(). app("__done__ = true;").
             closeBlock()
         }

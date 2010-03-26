@@ -15,7 +15,7 @@ FunctionAlias: class {
 InterfaceImpl: class extends ClassDecl {
     
     impl: ClassDecl
-    aliases := HashMap<FunctionAlias> new()
+    aliases := HashMap<String, FunctionAlias> new()
     
     init: func ~interf(.name, interfaceType: Type, =impl, .token) {
         super(name, interfaceType, token)
@@ -23,11 +23,11 @@ InterfaceImpl: class extends ClassDecl {
         meta module = impl module
     }
     
-    getAliases: func -> HashMap<FunctionDecl> { aliases }
+    getAliases: func -> HashMap<String, FunctionDecl> { aliases }
     
     resolve: func (trail: Trail, res: Resolver) -> Response {
         
-        if(!super resolve(trail, res) ok()) return Responses LOOP
+        if(!super(trail, res) ok()) return Responses LOOP
         
         ref := superType getRef() as TypeDecl
         if(ref == null) return Responses LOOP
@@ -48,6 +48,8 @@ InterfaceImpl: class extends ClassDecl {
                 aliases put(hash, FunctionAlias new(key, value))
             }
         }
+        
+        return Responses OK
         
     }
     

@@ -18,7 +18,7 @@ PipeUnix: class extends Pipe {
         }
         
         if(readFD == -1) {
-            fds := [-1]
+            fds : Int[1]; fds[0] = -1
             pipe(fds)
             this readFD = fds[0]
             if (pipe(fds) < 0) {
@@ -26,7 +26,7 @@ PipeUnix: class extends Pipe {
             }
         }
         if(writeFD == -1) {
-            fds := [-1]
+            fds : Int[1]; fds[0] = -1
             pipe(fds)
             this writeFD = fds[0]
             if (pipe(fds) < 0) {
@@ -36,7 +36,7 @@ PipeUnix: class extends Pipe {
     }
     
     init: func ~twos {
-        fds := [-1, -1]
+        fds : Int[2]; fds[0] = -1; fds[1] = -1
         /* Try to open a new pipe */
         if (pipe(fds) < 0) {
             "Error in creating the pipes" println()
@@ -48,8 +48,9 @@ PipeUnix: class extends Pipe {
     /** read 'len' bytes at most from the pipe */
     read: func(len: Int) -> Pointer {
         //return readFD read(len)
-        buf := gc_malloc(len)
-        read(readFD, buf, len)
+        buf := String new(len)
+        howmuch := read(readFD, buf, len)
+        buf[howmuch] = '\0'
         return buf
     }
     

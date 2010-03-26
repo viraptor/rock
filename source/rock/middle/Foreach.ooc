@@ -24,7 +24,7 @@ Foreach: class extends ControlStatement {
             case variable   => variable   = kiddo; replaced = true; return true
             case collection => collection = kiddo; return true
         }
-        return super replace(oldie, kiddo)
+        return super(oldie, kiddo)
     }
     
     resolve: func (trail: Trail, res: Resolver) -> Response {
@@ -58,12 +58,19 @@ Foreach: class extends ControlStatement {
         trail pop(this)
         
         if(!collection instanceOf(RangeLiteral)) {
+            if(collection getType() == null) {
+                res wholeAgain(this, "need collection type")
+                return Responses OK
+            }
+            collection getType() resolve(trail, res)
+
             iterCall := FunctionCall new(collection, "iterator", token)
             
             response := Responses LOOP
             while(response == Responses LOOP) {
                 response = iterCall resolve(trail, res)
             }
+            //printf("iterCall = %s, ref = %s\n", iterCall toString(), iterCall getRef() ? iterCall getRef() toString() : "(nil)")
             
             iterType := iterCall getType()
             if(iterType == null) {
@@ -113,11 +120,12 @@ Foreach: class extends ControlStatement {
                 decl setType(nextCall getType())
             }
                             
-            res wholeAgain(this, "Just turned into a while =)")
-            return Responses OK
+            //res wholeAgain(this, "Just turned into a while =)")
+            //return Responses OK
+            return Responses LOOP
         }
         
-        return super resolve(trail, res)
+        return super(trail, res)
         
     }
     
@@ -127,7 +135,7 @@ Foreach: class extends ControlStatement {
             vDecl := variable as VariableDecl
             if(vDecl name == access name && access suggest(vDecl)) return
         }
-        super resolveAccess(access)
+        super(access)
         
     }
     

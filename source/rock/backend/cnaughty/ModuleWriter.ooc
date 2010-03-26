@@ -13,8 +13,8 @@ ModuleWriter: abstract class extends Skeleton {
         fw app("/* "). app(module fullName). app(" header-forward file, generated with rock, the ooc compiler written in ooc */"). nl()
         cw app("/* "). app(module fullName). app(" source file, generated with rock, the ooc compiler written in ooc */"). nl()
 
-        hName    := "__"+ module fullName clone() replace('/', '_') replace('\\', '_') replace('-', '_') + "__"
-        hFwdName := "__"+ module fullName clone() replace('/', '_') replace('\\', '_') replace('-', '_') + "_fwd__"
+        hName    := "___"+ module fullName clone() replace('/', '_') replace('\\', '_') replace('-', '_') + "___"
+        hFwdName := "___"+ module fullName clone() replace('/', '_') replace('\\', '_') replace('-', '_') + "_fwd___"
 
         /* write the fwd-.h file */
         current = fw
@@ -42,7 +42,7 @@ ModuleWriter: abstract class extends Skeleton {
         // write imports' includes
         imports := classifyImports(this, module)
         for(imp in imports) {
-            inc := imp getModule() getPath(imp isTight ? ".h" : "-fwd.h")
+            inc := imp getModule() getPath("-fwd.h")
             current nl(). app("#include <"). app(inc). app(">")
         }
         
@@ -76,11 +76,28 @@ ModuleWriter: abstract class extends Skeleton {
         current nl(). app("#define "). app(hName). nl()
 
         current nl(). app("#include \""). app(module simpleName). app("-fwd.h\""). nl()
+        
+		// include .h-level imports (which contains types we extend)
+        for(imp in imports) {
+            if(!imp isTight()) continue
+            inc := imp getModule() getPath(".h")
+            current nl(). app("#include <"). app(inc). app(">")
+        }
+        current nl()
 
         /* write the .c file */
         current = cw
+        
         // write include to the module's. h file
         current nl(). app("#include \""). app(module simpleName). app(".h\""). nl()
+        
+        // now loose imports, in the .c it's safe =)
+        for(imp in imports) {
+            if(imp isTight()) continue
+            inc := imp getModule() getPath(".h")
+            current nl(). app("#include <"). app(inc). app(">")
+        }
+        current nl()
 
         // write all types, non-metas first, then metas
         for(tDecl: TypeDecl in module types) {
@@ -119,7 +136,8 @@ ModuleWriter: abstract class extends Skeleton {
         for (type in module types) {
             if(type instanceOf(ClassDecl)) {
                 cDecl := type as ClassDecl
-                loadFunc := cDecl getFunction(ClassDecl LOAD_FUNC_NAME, null, null)
+                finalScore: Int
+                loadFunc := cDecl getFunction(ClassDecl LOAD_FUNC_NAME, null, null, finalScore&)
                 if(loadFunc) {
                     if(cDecl getVersion()) VersionWriter writeStart(this, cDecl getVersion())
                     current nl(). app(loadFunc getFullName()). app("();")

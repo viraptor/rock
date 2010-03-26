@@ -40,8 +40,9 @@ FunctionCallWriter: abstract class extends Skeleton {
             if(!(callType equals(declType))) {
                 current app("("). app(declType). app(") ")
             }
-            
-            current app(fCall expr) 
+        
+            if(fDecl isThisRef) current app("&("). app(fCall expr). app(")")
+            else                current app(fCall expr) 
         }
     
         /* Step 2 : write generic return arg, if any */
@@ -103,7 +104,7 @@ FunctionCallWriter: abstract class extends Skeleton {
             if(declArg != null) {
                 if(declArg getType() isGeneric()) {
                     current app("(uint8_t*) ")
-                } else if(arg getType != null && declArg getType() != null && arg getType() inheritsFrom(declArg getType())) {
+                } else if(arg getType() != null && declArg getType() != null && arg getType() inheritsFrom(declArg getType())) {
                     //printf("%s inherits from %s, casting!\n", arg getType() toString(), declArg getType() toString())
                     current app("("). app(declArg getType()). app(")")
                 }

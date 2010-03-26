@@ -14,7 +14,7 @@ Requirement: class {
 }
 
 UseDef: class {
-    cache := static HashMap<UseDef> new()
+    cache := static HashMap<String, UseDef> new()
     
     identifier, name = "", description = "": String
     
@@ -35,13 +35,13 @@ UseDef: class {
     getIncludePaths: func -> List<String>      { includePaths }
 
     parse: static func (identifier: String, params: BuildParams) -> UseDef {
-        cached := cache get(identifier)
+        cached := This cache get(identifier)
         if(!cached) {
             cached = UseDef new(identifier)
             file := findUse(identifier + ".use", params)
             if(!file) return null
             cached read(file, params)
-            cache put(identifier, cached)
+            This cache put(identifier, cached)
         }
         
         cached
@@ -123,13 +123,12 @@ UseDef: class {
                     requirements add(Requirement new(req trim(), "0")) // TODO: Version support!
                 }
             } else if(id == "SourcePath") {
-                printf("value = %s, file = %s\n", value, file getPath())
                 sourcePathFile := File new(value)
                 if(sourcePathFile isRelative()) {
                     /* is relative. TODO: better check? */
                     sourcePathFile = file parent() getChild(value) getAbsoluteFile()
                 }
-                if(params verbose) "Adding %s to sourcepath ..." format(sourcePathFile path) println()
+                if(params veryVerbose) "Adding %s to sourcepath ..." format(sourcePathFile path) println()
                 params sourcePath add(sourcePathFile path)
             }
             reader hasWhitespace(true)

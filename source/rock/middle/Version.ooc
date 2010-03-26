@@ -22,7 +22,7 @@ VersionBlock: class extends ControlStatement {
     toString: func -> String { spec toString() }
     
     resolve: func (trail: Trail, res: Resolver) -> Response {
-        if(!super resolve(trail, res) ok()) return Responses LOOP
+        if(!super(trail, res) ok()) return Responses LOOP
         
         return spec resolve()
     }
@@ -47,7 +47,7 @@ VersionSpec: abstract class {
     
 }
 
-builtinNames := HashMap<String> new()
+builtinNames := HashMap<String, String> new()
 
 {
     // ooc's excuse for a map literal (so far ^^)    

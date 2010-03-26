@@ -15,7 +15,7 @@ RangeLiteral: class extends Literal {
     
     resolve: func (trail: Trail, res: Resolver) -> Response {
         {
-            response := super resolve(trail, res)
+            response := super(trail, res)
             if(!response ok()) return response
         }
         
@@ -42,7 +42,7 @@ RangeLiteral: class extends Literal {
         return Responses OK
     }
     
-    getType: func -> Type { type }
+    getType: func -> Type { This type }
     
     replace: func (oldie, kiddo: Node) -> Bool {
         match oldie {

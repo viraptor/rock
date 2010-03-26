@@ -48,7 +48,7 @@ Comparison: class extends Expression {
         visitor visitComparison(this)
     }
     
-    getType: func -> Type { type }
+    getType: func -> Type { This type }
     
     toString: func -> String {
         return left toString() + " " + CompTypes repr get(compType) + " " + right toString()
@@ -72,7 +72,7 @@ Comparison: class extends Expression {
             }
         }
         {
-            response := type resolve(trail, res)
+            response := This type resolve(trail, res)
             if(!response ok()) {
                 trail pop(this)
                 return response
@@ -152,7 +152,9 @@ Comparison: class extends Expression {
             
             if(!trail peek() replace(this, node)) {
                 if(res fatal) token throwError("Couldn't replace %s with %s!" format(toString(), node toString()))
-                return Responses LOOP
+                res wholeAgain(this, "failed to replace oneself, gotta try again =)")
+                return Responses OK
+                //return Responses LOOP
             }
             res wholeAgain(this, "Just replaced with an operator overloading")
         }

@@ -10,16 +10,16 @@ Module: class extends Node {
 
     path, fullName, simpleName, packageName, underName, pathElement : String
 
-    types      := OrderedMultiMap<TypeDecl> new()
-    functions  := OrderedMultiMap<FunctionDecl> new()
+    types      := OrderedMultiMap<String, TypeDecl> new()
+    functions  := OrderedMultiMap<String, FunctionDecl> new()
     operators  := ArrayList<OperatorDecl> new()
 
     includes   := ArrayList<Include> new()
     imports    := ArrayList<Import> new()
-    namespaces := HashMap<NamespaceDecl> new()
+    namespaces := HashMap<String, NamespaceDecl> new()
     uses       := ArrayList<Use> new()
 
-    funcTypesMap := HashMap<FuncType> new()
+    funcTypesMap := HashMap<String, FuncType> new()
 
     body       := Scope new()
 
@@ -93,7 +93,7 @@ Module: class extends Node {
     }
 
     getOperators: func -> List<OperatorDecl> { operators }
-    getTypes:     func -> HashMap<TypeDecl>  { types }
+    getTypes:     func -> HashMap<String, TypeDecl>  { types }
     getUses:      func -> List<Use>          { uses }
 
     accept: func (visitor: Visitor) { visitor visitModule(this) }
@@ -174,14 +174,14 @@ Module: class extends Node {
         fDecl = functions get(call name)
         if(fDecl) {
             //"&&&&&&&& Found fDecl for call %s\n" format(call name) println()
-            if(call suggest(fDecl)) return
+            call suggest(fDecl)
         }
 
         for(imp in getGlobalImports()) {
             fDecl = imp getModule() functions get(call name)
             if(fDecl) {
                 //"&&&&&&&& Found fDecl for call %s in module %s\n" format(call name, imp getModule() fullName) println()
-                if(call suggest(fDecl)) return
+                call suggest(fDecl)
             }
         }
     }
@@ -211,7 +211,7 @@ Module: class extends Node {
         finalResponse := Responses OK
 
         trail push(this)
-
+        
         {
             response := body resolve(trail, res)
             if(!response ok()) {
@@ -219,7 +219,7 @@ Module: class extends Node {
                 finalResponse = response
             }
         }
-
+        
         for(tDecl in types) {
             if(tDecl isResolved()) continue
             response := tDecl resolve(trail, res)

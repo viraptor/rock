@@ -59,7 +59,6 @@ ControlStatementWriter: abstract class extends Skeleton {
     
     write: static func ~_match (this: This, mat: Match) {
         isFirst := true
-        
 		for(caze in mat getCases()) {
 			if(!isFirst) current app(" else ")
 
